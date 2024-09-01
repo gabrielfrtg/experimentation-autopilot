@@ -1,0 +1,43 @@
+# Define project to experiment on
+project_name: "dummy_project"
+project_path: "/home/users/gfreytag/devel/experimentation-autopilot/dummy_project"
+project_executable: "dummy_exec.sh"
+experiment_folder_name: "/home/users/gfreytag/devel/experimentation-autopilot/experiment_results"
+
+# Experiment data filenames
+all_experiments_filename: "combi.txt"
+done_experiments_filename: "expes.txt"
+results_filename: "expe_results.csv"
+cpu_output_filename: "cpu_power.csv"
+gpu_output_filename: "gpu_power.csv"
+
+# Hardware information
+gpu_manufacturer: "amd" # nvidia, amd, intel (maybe none to disable gpu hardware stats collection collection)
+cpu_manufacturer: "amd" # nvidia, amd, intel
+gpu_id: "GPU-4ae69f76-868b-6458-0121-008176bcd866"
+gpu_collect_freq: 10 # Milliseconds
+cpu_collect_freq: 100 # Milliseconds
+
+# Cooling down configuration
+cooldown_time: 10 # Seconds
+
+# Define experiment parameters
+versions:
+  - "version1"
+  - "version2"
+  - "version3"
+  - "version4"
+sizes:
+  - 216
+  - 408
+times:
+  - 0.2
+  - 1
+repeats:
+  - 1
+  - 2
+
+# List of temporary file extensions to be constantly deleted
+temp_file_extensions:
+  - ".out"
+  - ".rsf"

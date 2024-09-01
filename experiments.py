@@ -4,38 +4,26 @@ from itertools import product
 import subprocess
 import time
 
+from configuration.handler import get_data
+import hardware_stats.collector as hardware_stats_collector
 
 
 
-# Define experiment filenames
-all_experiments_filename = 'combi.txt'
-done_experiments_filename = 'expes.txt'
-
-results_filename = "expe_results.csv"
-
-gpu_id = "GPU-4ae69f76-868b-6458-0121-008176bcd866"
-gpu_output_filename = "gpu_power.csv"
-
-cooldown_time = 60 # Time in seconds
-
-# Define experiment parameters
-versions = ['version1', 'version2', 'version3', 'version4']
-sizes = [216, 408, 600, 792]
-times = [0.2, 1, 2]
-repeats = [1, 2, 3]
-
+def create_experiment_folder():
+    if not os.path.exists(get_data().experiment_folder_name):
+        os.makedirs(get_data().experiment_folder_name)
 
 
 
 def create_randomized():
-    if not os.path.exists(all_experiments_filename):
+    if not os.path.exists(get_data().all_experiments_filename):
         # Generate all possible combinations
-        all_experiments = list(product(versions, sizes, times, repeats))
+        all_experiments = list(product(get_data().versions, get_data().sizes, get_data().times, get_data().repeats))
 
         # Shuffle the combinations randomly
         random.shuffle(all_experiments)
 
-        with open(all_experiments_filename, 'w') as file:
+        with open(get_data().all_experiments_filename, 'w') as file:
             for combination in all_experiments:
                 line = ', '.join(map(str, combination))  # Convert each element to a string
                 file.write(f"{line}\n")
@@ -64,35 +52,20 @@ def read(filename, data):
 
 
 def checkpoint(data):
-    with open(done_experiments_filename, 'a+') as file:
+    with open(get_data().done_experiments_filename, 'a+') as file:
         line = ', '.join(map(str, data))
         file.write(f"{line}\n")
 
 
 
 def cooldown():
-    time.sleep(cooldown_time)
+    time.sleep(get_data().cooldown_time)
 
 
 
 def clean_temporary_files():
-    subprocess.run(["find", "/path/to/folder", "-name", "*.rsf*", "-delete"])
-
-
-
-def start_nvidia_smi():
-    if not os.path.exists(gpu_output_filename):
-        with open(gpu_output_filename, "w") as file:
-            file.write(f"timestamp, name, uuid, pstate, memory.total [MiB], memory.used [MiB], memory.free [MiB], temperature.gpu, utilization.memory [%], utilization.gpu [%], power.management, power.draw [W]\n")
-
-    command = ["nvidia-smi", "--id", str(gpu_id), "--format=csv,noheader,nounits", "--loop-ms=100", "--query-gpu=timestamp,name,uuid,pstate,memory.total,memory.used,memory.free,temperature.gpu,utilization.memory,utilization.gpu,power.management,power.draw"]
-    with open(gpu_output_filename, "a+") as f:
-        subprocess.Popen(command, stdout=f)
-
-
-
-def stop_nvidia_smi():
-    subprocess.run(["pkill", "nvidia-smi"])
+    for extension in get_data().temp_file_extensions:
+        subprocess.run(["find", get_data().project_path, "-iname", f"*.{extension}*", "-delete"])
 
 
 
@@ -103,30 +76,37 @@ def run(experiment):
     expe_time = experiment[2]
     
     try:
-        print(f"/path/to/{expe_version}/executable {expe_size} {expe_time}")
+        print(f"Running {get_data().project_path}/{expe_version}/{get_data().project_executable} with size {expe_size} and simulation time {expe_time}...")
 
-        command = f"perf stat -e power/energy-pkg/ -x, -o cpu_power.csv /path/to/{expe_version}/executable {expe_size} {expe_time}"
+        command = f"{get_data().project_path}/{expe_version}/{get_data().project_executable} TTI {expe_size} {expe_size} {expe_size} 16 12.5 12.5 12.5 0.001 {expe_time}"
+        print(command)
 
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=os.environ.copy())
         output, _ = process.communicate()
 
-        # Extract relevant data
+        # Stop hardware stats collector to get the final stats
+        hardware_stats_collector.stop()
+
+        # Extract only the CSV formated line with experimental data
         output = output.decode("utf-8")
         output = next((line for line in output.split('\n') if line.startswith(str(expe_version))), None)
 
-        joules = subprocess.check_output(["tail", "-n", "+3", "cpu_power.csv"]).decode("utf-8")
+        joules = subprocess.check_output(["head", "-n", "1", f"{get_data().cpu_output_filename}"]).decode("utf-8")
         joules = joules.strip().split(',')[0]
 
         # Combine output
-        output += f",{joules}"
+        if output is not None:
+            output += f",{joules}"
+        else:
+            output = f"{expe_version},TTI,{expe_size},{expe_size},{expe_size},16,12.5,12.5,12.5,0.001,{expe_time},,,,,,{joules}"
 
-        with open(f"{results_filename}", "a+") as f:
+        with open(f"{get_data().results_filename}", "a+") as f:
             f.write(output + "\n")  # Write joules in the same line
 
         print(f"{output}")
     except KeyboardInterrupt:
-        # If Ctrl+C is pressed during experiments, stop nvidia-smi
-        stop_nvidia_smi()
+        # If Ctrl+C is pressed during experiments, stop hardware stats collector and clean temporary files
+        hardware_stats_collector.stop()
         clean_temporary_files()
         raise
 
