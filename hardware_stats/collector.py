@@ -7,37 +7,39 @@ from configuration.handler import get_data
 
 
 def start():
-    if get_data().gpu_manufacturer == "nvidia":
-        start_nvidia_smi()
-    elif get_data().gpu_manufacturer == "amd":
-        start_rocm_smi()
-    elif get_data().gpu_manufacturer == "intel":
-        start_xpu_smi()
+    if not get_data().use_slurm:
+        if get_data().gpu_manufacturer == "nvidia":
+            start_nvidia_smi()
+        elif get_data().gpu_manufacturer == "amd":
+            start_rocm_smi()
+        elif get_data().gpu_manufacturer == "intel":
+            start_xpu_smi()
 
-    if get_data().cpu_manufacturer == "nvidia":
-        if get_data().cpu_collect_freq < 50:
-            get_data().cpu_collect_freq = 50
-        start_grace()
-    elif get_data().cpu_manufacturer == "amd":
-        start_perf()
-    elif get_data().cpu_manufacturer == "intel":
-        start_perf()
+        if get_data().cpu_manufacturer == "nvidia":
+            if get_data().cpu_collect_freq < 50:
+                get_data().cpu_collect_freq = 50
+            start_grace()
+        elif get_data().cpu_manufacturer == "amd":
+            start_perf()
+        elif get_data().cpu_manufacturer == "intel":
+            start_perf()
         
 
 def stop():
-    if get_data().gpu_manufacturer == "nvidia":
-        stop_nvidia_smi()
-    elif get_data().gpu_manufacturer == "amd":
-        stop_rocm_smi()
-    elif get_data().gpu_manufacturer == "intel":
-        stop_xpu_smi()
+    if not get_data().use_slurm:
+        if get_data().gpu_manufacturer == "nvidia":
+            stop_nvidia_smi()
+        elif get_data().gpu_manufacturer == "amd":
+            stop_rocm_smi()
+        elif get_data().gpu_manufacturer == "intel":
+            stop_xpu_smi()
 
-    if get_data().cpu_manufacturer == "nvidia":
-        stop_grace()
-    elif get_data().cpu_manufacturer == "amd":
-        stop_perf()
-    elif get_data().cpu_manufacturer == "intel":
-        stop_perf()
+        if get_data().cpu_manufacturer == "nvidia":
+            stop_grace()
+        elif get_data().cpu_manufacturer == "amd":
+            stop_perf()
+        elif get_data().cpu_manufacturer == "intel":
+            stop_perf()
 
 
 

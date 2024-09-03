@@ -6,6 +6,7 @@ import time
 
 from configuration.handler import get_data
 import hardware_stats.collector as hardware_stats_collector
+from sbatch.launcher import initialize_sbatch, launch_job
 
 
 
@@ -59,7 +60,8 @@ def checkpoint(data):
 
 
 def cooldown():
-    time.sleep(get_data().cooldown_time)
+    if not get_data().use_slurm:
+        time.sleep(get_data().cooldown_time)
 
 
 
@@ -81,29 +83,33 @@ def run(experiment):
         command = f"{get_data().project_path}/{expe_version}/{get_data().project_executable} TTI {expe_size} {expe_size} {expe_size} 16 12.5 12.5 12.5 0.001 {expe_time}"
         print(command)
 
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=os.environ.copy())
-        output, _ = process.communicate()
-
-        # Stop hardware stats collector to get the final stats
-        hardware_stats_collector.stop()
-
-        # Extract only the CSV formated line with experimental data
-        output = output.decode("utf-8")
-        output = next((line for line in output.split('\n') if line.startswith(str(expe_version))), None)
-
-        joules = subprocess.check_output(["head", "-n", "1", f"{get_data().cpu_output_filename}"]).decode("utf-8")
-        joules = joules.strip().split(',')[0]
-
-        # Combine output
-        if output is not None:
-            output += f",{joules}"
+        if get_data().use_slurm:
+            initialize_sbatch(command, expe_version)
+            launch_job()
         else:
-            output = f"{expe_version},TTI,{expe_size},{expe_size},{expe_size},16,12.5,12.5,12.5,0.001,{expe_time},,,,,,{joules}"
+            process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=os.environ.copy())
+            output, _ = process.communicate()
 
-        with open(f"{get_data().results_filename}", "a+") as f:
-            f.write(output + "\n")  # Write joules in the same line
+            # Stop hardware stats collector to get the final stats
+            hardware_stats_collector.stop()
 
-        print(f"{output}")
+            # Extract only the CSV formated line with experimental data
+            output = output.decode("utf-8")
+            output = next((line for line in output.split('\n') if line.startswith(str(expe_version))), None)
+
+            joules = subprocess.check_output(["head", "-n", "1", f"{get_data().cpu_output_filename}"]).decode("utf-8")
+            joules = joules.strip().split(',')[0]
+
+            # Combine output
+            if output is not None:
+                output += f",{joules}"
+            else:
+                output = f"{expe_version},TTI,{expe_size},{expe_size},{expe_size},16,12.5,12.5,12.5,0.001,{expe_time},,,,,,{joules}"
+
+            with open(f"{get_data().results_filename}", "a+") as f:
+                f.write(output + "\n")  # Write joules in the same line
+
+            print(f"{output}")
     except KeyboardInterrupt:
         # If Ctrl+C is pressed during experiments, stop hardware stats collector and clean temporary files
         hardware_stats_collector.stop()
